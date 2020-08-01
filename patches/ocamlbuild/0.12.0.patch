@@ -1,0 +1,14 @@
+diff -r -u ocamlbuild-0.12.1-orig/src/ocamlbuild_where.ml ocamlbuild-0.12.1-reloc/src/ocamlbuild_where.ml
+--- ocamlbuild-0.12.1-orig/src/ocamlbuild_where.ml	2017-11-11 18:10:49.000000000 +0100
++++ ocamlbuild-0.12.1-reloc/src/ocamlbuild_where.ml	2020-07-16 16:01:11.295979210 +0200
+@@ -48,3 +48,10 @@
+   in
+   Filename.concat root suffix
+ end;;
++
++let bindir, libdir =
++  match Sys.getenv "OPAM_SWITCH_PREFIX" with
++  | exception Not_found -> bindir, libdir
++  | opam_switch_prefix ->
++    ref ( Filename.concat opam_switch_prefix "bin" ),
++    ref ( Filename.concat opam_switch_prefix "lib/ocamlbuild" )

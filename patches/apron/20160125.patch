@@ -1,0 +1,13 @@
+diff -r -u apron-import-svn1104-orig/vars.mk apron-import-svn1104-reloc/vars.mk
+--- apron-import-svn1104-orig/vars.mk	2018-06-24 22:24:47.000000000 +0200
++++ apron-import-svn1104-reloc/vars.mk	2020-07-17 09:20:47.150966089 +0200
+@@ -3,7 +3,7 @@
+ SRCROOT ?= ..
+ 
+ APRON_INCLUDE = $(APRON_PREFIX)/include
+-APRON_LIB = $(APRON_PREFIX)/lib
++APRON_LIB = $(APRON_PREFIX)/lib/apron
+ APRON_BIN = $(APRON_PREFIX)/bin
+ 
+ ifneq ($(OCAMLFIND),)
+Only in apron-import-svn1104-reloc/: vars.mk~

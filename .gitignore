@@ -1,0 +1,6 @@
+*~
+/*.tar
+/work/
+/download-cache
+/env.sh
+/root

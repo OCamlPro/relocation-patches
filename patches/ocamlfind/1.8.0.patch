@@ -1,0 +1,104 @@
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' ocamlfind.1.8.0-orig/Makefile ocamlfind.1.8.0-reloc/Makefile
+--- ocamlfind.1.8.0-orig/Makefile	2018-04-16 10:13:23.000000000 +0200
++++ ocamlfind.1.8.0-reloc/Makefile	2020-08-01 19:53:41.377426264 +0200
+@@ -55,7 +55,7 @@
+ 	USE_CYGPATH="$(USE_CYGPATH)"; \
+ 	export USE_CYGPATH; \
+ 	cat findlib.conf.in | \
+-	    $(SH) tools/patch '@SITELIB@' '$(OCAML_SITELIB)' >findlib.conf
++	    $(SH) tools/patch '@SITELIB@' '+..' >findlib.conf
+ 	if ./tools/cmd_from_same_dir ocamlc; then \
+ 		echo 'ocamlc="ocamlc.opt"' >>findlib.conf; \
+ 	fi
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' ocamlfind.1.8.0-orig/src/findlib/findlib_config.mlp ocamlfind.1.8.0-reloc/src/findlib/findlib_config.mlp
+--- ocamlfind.1.8.0-orig/src/findlib/findlib_config.mlp	2018-04-16 10:13:23.000000000 +0200
++++ ocamlfind.1.8.0-reloc/src/findlib/findlib_config.mlp	2020-08-01 19:53:41.377426264 +0200
+@@ -3,9 +3,12 @@
+  *
+  *)
+
+-let config_file = "@CONFIGFILE@";;
+-
+-let ocaml_stdlib = "@STDLIB@";;
++let ( config_file, ocaml_stdlib) =
++  match Sys.getenv "OPAM_SWITCH_PREFIX" with
++  | exception Not_found -> ( "@CONFIGFILE@", "@STDLIB@" )
++  | opam_switch_prefix ->
++    ( Filename.concat opam_switch_prefix "lib/findlib.conf",
++      Filename.concat opam_switch_prefix "lib/ocaml" )
+
+ let ocaml_ldconf = Filename.concat ocaml_stdlib "ld.conf";;
+
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' ocamlfind.1.8.0-orig/src/findlib/findlib.ml ocamlfind.1.8.0-reloc/src/findlib/findlib.ml
+--- ocamlfind.1.8.0-orig/src/findlib/findlib.ml	2018-04-16 10:13:23.000000000 +0200
++++ ocamlfind.1.8.0-reloc/src/findlib/findlib.ml	2020-08-01 19:53:41.377426264 +0200
+@@ -111,6 +111,19 @@
+     ( try Sys.getenv "OCAMLFIND_CONF" with Not_found -> "") in
+   if p = "" then Findlib_config.config_file else p
+
++let ocaml_in_opam = match Sys.getenv "OPAM_SWITCH_PREFIX" with
++  | exception Not_found -> None
++  | s -> Some ( Filename.concat s "lib/ocaml" )
++
++let in_opam dir =
++  let len = String.length dir in
++  if len > 0 && dir.[0] = '+' then
++    match ocaml_in_opam with
++    | None -> failwith "+relative path without OPAM_SWITCH_PREFIX"
++    | Some ocaml_in_opam ->
++      Filename.concat ocaml_in_opam (String.sub dir 1 (len-1))
++  else
++    dir
+
+ let init
+       ?env_ocamlpath ?env_ocamlfind_destdir ?env_ocamlfind_metadir
+@@ -198,8 +211,8 @@
+ 	    (lookup "ocamldep" ocamldep_default),
+ 	    (lookup "ocamlbrowser" ocamlbrowser_default),
+ 	    (lookup "ocamldoc" ocamldoc_default),
+-	    Fl_split.path (lookup "path" ""),
+-	    (lookup "destdir" ""),
++	    List.map in_opam @@ Fl_split.path (lookup "path" ""),
++	    in_opam (lookup "destdir" ""),
+ 	    (lookup "metadir" "none"),
+ 	    (lookup "stdlib" Findlib_config.ocaml_stdlib),
+ 	    (lookup "ldconf" Findlib_config.ocaml_ldconf)
+@@ -517,4 +530,3 @@
+
+ let recorded_predicates() =
+   !rec_preds
+-
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' ocamlfind.1.8.0-orig/src/findlib/frontend.ml ocamlfind.1.8.0-reloc/src/findlib/frontend.ml
+--- ocamlfind.1.8.0-orig/src/findlib/frontend.ml	2018-04-16 10:13:23.000000000 +0200
++++ ocamlfind.1.8.0-reloc/src/findlib/frontend.ml	2020-08-01 19:53:41.377426264 +0200
+@@ -233,7 +233,17 @@
+     while true do
+       let line = input_line f in
+       if line <> "" then
+-	lines := line :: !lines
++        lines :=
++          (if line.[0] = '+' then
++             let line =
++               Filename.concat
++                 (Findlib.ocaml_stdlib ())
++                 (String.sub line 1 ((String.length line) - 1))
++             in
++             Printf.eprintf "ldconf+ %s\n%!" line;
++             line
++           else
++             line) :: !lines
+     done;
+     assert false
+   with
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' ocamlfind.1.8.0-orig/src/findlib/Makefile ocamlfind.1.8.0-reloc/src/findlib/Makefile
+--- ocamlfind.1.8.0-orig/src/findlib/Makefile	2018-04-16 10:13:23.000000000 +0200
++++ ocamlfind.1.8.0-reloc/src/findlib/Makefile	2020-08-01 19:53:41.377426264 +0200
+@@ -106,5 +106,5 @@
+ 	USE_CYGPATH="$(USE_CYGPATH)"; \
+ 	export USE_CYGPATH; \
+ 	cat topfind_rd$(OCAML_REMOVE_DIRECTORY).p | \
+-	        $(SH) $(TOP)/tools/patch '@SITELIB@' '$(OCAML_SITELIB)' \
++	        $(SH) $(TOP)/tools/patch '@SITELIB@' '+..' \
+ 	    	    >topfind
+
+ num_top.cma: $(NUMTOP_OBJECTS)

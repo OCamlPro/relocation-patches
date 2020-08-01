@@ -1,0 +1,11 @@
+diff -r -u ocaml-config.1.orig/gen_ocaml_config.ml ocaml-config.1.rloc/gen_ocaml_config.ml
+--- ocaml-config.1.orig/gen_ocaml_config.ml	2020-08-01 16:35:33.000000000 +0200
++++ ocaml-config.1.rloc/gen_ocaml_config.ml	2020-08-01 16:40:07.120427644 +0200
+@@ -38,6 +38,7 @@
+   let p fmt = Printf.fprintf oc (fmt ^^ "\n") in
+   p "opam-version: \"2.0\"";
+   p "variables {";
++  p "  relocatable: true";
+   p "  native: %b"
+     (Sys.file_exists (ocaml^"opt"^suffix));
+   p "  native-tools: %b"

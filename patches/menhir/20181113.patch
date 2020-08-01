@@ -1,0 +1,42 @@
+diff -r -u menhir-20181113-orig/src/settings.ml menhir-20181113-reloc/src/settings.ml
+--- menhir-20181113-orig/src/settings.ml	2018-11-13 10:51:43.000000000 +0100
++++ menhir-20181113-reloc/src/settings.ml	2020-07-16 20:38:10.261054872 +0200
+@@ -188,13 +188,18 @@
+ let no_stdlib =
+   ref false
+ 
++let libdir = Installation.libdir
++
++let libdir = match Sys.getenv "OPAM_SWITCH_PREFIX" with
++  | exception Not_found -> libdir
++  | libdir -> Filename.concat libdir "lib/menhir"
++
+ (* By default, [stdlib_path] is [Installation.libdir], that is, the directory
+    that was specified when Menhir was compiled. This is overridden by the
+    environment variable $MENHIR_STDLIB, if it is defined, and by the --stdlib
+    command line option, if present. *)
+ 
+-let stdlib_path =
+-  ref Installation.libdir
++let stdlib_path = ref libdir
+ 
+ let () =
+   try
+@@ -420,7 +425,7 @@
+         if Installation.ocamlfind then
+           printf "-package menhirLib\n%!"
+         else
+-          printf "-I %s\n%!" Installation.libdir;
++          printf "-I %s\n%!" libdir;
+       exit 0
+   | SuggestLinkFlags extension ->
+       if !table then
+@@ -434,7 +439,7 @@
+         let _ = Sys.command "ocamlfind query menhirLib" in
+         ()
+       else
+-        printf "%s\n%!" Installation.libdir;
++        printf "%s\n%!" libdir;
+       exit 0
+   | SuggestUseOcamlfind ->
+       printf "%b\n" Installation.ocamlfind;

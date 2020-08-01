@@ -1,0 +1,12 @@
+diff -r -u mlgmpidl-1.2.9-orig/Makefile mlgmpidl-1.2.9-reloc/Makefile
+--- mlgmpidl-1.2.9-orig/Makefile	2019-04-01 15:39:53.000000000 +0200
++++ mlgmpidl-1.2.9-reloc/Makefile	2020-07-16 17:36:02.724599123 +0200
+@@ -18,7 +18,7 @@
+ SITE-LIB = $(shell $(OCAMLFIND) printconf destdir)
+ PKG-NAME = gmp
+ SITE-LIB-PKG = $(SITE-LIB)/$(PKG-NAME)
+-REQ_PKG = bigarray
++REQ_PKG = bigarray camlidl
+ OCAMLCCOPT = -ccopt -L$(SITE-LIB)/stublibs -ccopt -L$(SITE-LIB-PKG)
+ OCAMLC := $(OCAMLFIND) ocamlc -package "$(REQ_PKG)"
+ OCAMLOPT := $(OCAMLFIND) ocamlopt -package "$(REQ_PKG)"
