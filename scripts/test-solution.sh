@@ -25,8 +25,13 @@ export OPAM_BIN_RELOC=true
 # compiled. MORE_PACKAGES are packages that are not tested for relocation,
 # only that their dependencies are relocatable
 
-OK_PACKAGES=" conf-m4.1 base-bigarray.base conf-which.1 conf-openssl.2
-conf-pkg-config.1.2 "
+if [ -f "solution.ok" ] ; then
+    OK_PACKAGES=$(cat solution.ok)
+else
+
+    OK_PACKAGES=" conf-m4.1 base-bigarray.base conf-which.1 conf-openssl.2
+    conf-pkg-config.1.2 "
+fi
 
 PACKAGES="$(cat solution.txt)"
 
