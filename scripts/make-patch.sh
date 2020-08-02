@@ -38,4 +38,5 @@ if [ -f $VERSION.patch ]; then
     call_safe mv -f $VERSION.patch $VERSION.patch.1
 fi
 
+echo -e "${RED} diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' $NV-orig $NV-reloc > $VERSION.patch ${NC}"
 diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' $NV-orig $NV-reloc > $VERSION.patch

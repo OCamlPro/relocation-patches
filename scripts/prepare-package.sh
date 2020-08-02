@@ -38,10 +38,11 @@ call mkdir -p $NAME/$VERSION
 cd $NAME/$VERSION
 
 
+
 call opam source $NV
 call mv $NV $NV-orig
 
-call_out OPAM opam show --raw $NV
+call_out OPAM opam show --safe --raw $NV
 
 call ln -sf ../../../scripts/make-patch.sh
 call ln -sf ../../../scripts/reapply-patch.sh

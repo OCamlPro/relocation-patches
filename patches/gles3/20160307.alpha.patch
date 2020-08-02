@@ -1,0 +1,12 @@
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' gles3.20160307.alpha-orig/Makefile gles3.20160307.alpha-reloc/Makefile
+--- gles3.20160307.alpha-orig/Makefile	2016-03-07 19:30:39.000000000 +0100
++++ gles3.20160307.alpha-reloc/Makefile	2020-08-02 10:24:21.312587969 +0200
+@@ -2,7 +2,7 @@
+ MINOR = alpha
+ VERSION = $(MAJOR).$(MINOR)
+ 
+-CC	     = gcc -fPIC
++CC	     = ocamlc -ccopt -fPIC
+ OCAMLFIND    = ocamlfind
+ OCAML        = ocaml
+ OCAMLC       = $(OCAMLFIND) ocamlc

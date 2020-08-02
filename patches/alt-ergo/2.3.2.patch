@@ -1,0 +1,140 @@
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' alt-ergo.2.3.2-orig/lib/dune alt-ergo.2.3.2-reloc/lib/dune
+--- alt-ergo.2.3.2-orig/lib/dune	2020-03-24 15:11:53.000000000 +0100
++++ alt-ergo.2.3.2-reloc/lib/dune	2020-08-01 21:31:05.615934712 +0200
+@@ -29,7 +29,7 @@
+     Parsed Profiling Satml_types Symbols
+     Expr Var Ty Typed Xliteral
+     ; util
+-    Config Emap Gc_debug Hconsing Hstring Iheap Lists Loc
++    Config Config_reloc Emap Gc_debug Hconsing Hstring Iheap Lists Loc
+     MyDynlink MyUnix Numbers NumsNumbers NumbersInterface
+     Options Timers Util Vec Version ZarithNumbers
+   )
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' alt-ergo.2.3.2-orig/lib/reasoners/inequalities.ml alt-ergo.2.3.2-reloc/lib/reasoners/inequalities.ml
+--- alt-ergo.2.3.2-orig/lib/reasoners/inequalities.ml	2020-03-24 15:11:53.000000000 +0100
++++ alt-ergo.2.3.2-reloc/lib/reasoners/inequalities.ml	2020-08-01 21:31:05.615934712 +0200
+@@ -383,11 +383,11 @@
+         Format.eprintf ">> Failure message: %s@.@."
+           (MyDynlink.error_message m1);
+       end;
+-      let prefixed_path = sprintf "%s/%s" Config.pluginsdir path in
++      let prefixed_path = sprintf "%s/%s" Config_reloc.pluginsdir path in
+       if Options.debug_fm () then
+         eprintf
+           "[Dynlink] Loading the 'inequalities' reasoner in %s with prefix %s@."
+-          path Config.pluginsdir;
++          path Config_reloc.pluginsdir;
+       try
+         MyDynlink.loadfile prefixed_path;
+         if Options.debug_fm () then  eprintf "Success !@.@."
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' alt-ergo.2.3.2-orig/lib/reasoners/sat_solver.ml alt-ergo.2.3.2-reloc/lib/reasoners/sat_solver.ml
+--- alt-ergo.2.3.2-orig/lib/reasoners/sat_solver.ml	2020-03-24 15:11:53.000000000 +0100
++++ alt-ergo.2.3.2-reloc/lib/reasoners/sat_solver.ml	2020-08-01 21:31:05.615934712 +0200
+@@ -54,10 +54,10 @@
+         Format.eprintf ">> Failure message: %s@.@."
+                              (MyDynlink.error_message m1);
+       end;
+-      let prefixed_path = sprintf "%s/%s" Config.pluginsdir path in
++      let prefixed_path = sprintf "%s/%s" Config_reloc.pluginsdir path in
+       if debug_sat () then
+         eprintf "[Dynlink] Loading the SAT-solver in %s ... with prefix %s@."
+-          path Config.pluginsdir;
++          path Config_reloc.pluginsdir;
+       try
+         MyDynlink.loadfile prefixed_path;
+         if debug_sat () then  eprintf "Success !@.@."
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' alt-ergo.2.3.2-orig/lib/util/config_reloc.ml alt-ergo.2.3.2-reloc/lib/util/config_reloc.ml
+--- alt-ergo.2.3.2-orig/lib/util/config_reloc.ml	1970-01-01 01:00:00.000000000 +0100
++++ alt-ergo.2.3.2-reloc/lib/util/config_reloc.ml	2020-08-01 21:31:05.615934712 +0200
+@@ -0,0 +1,26 @@
++
++let (libdir,
++     pluginsdir,
++     preludesdir,
++     datadir,
++     mandir) =
++  match Sys.getenv "OPAM_SWITCH_PREFIX" with
++  | exception _ ->
++    (Config.libdir,
++     Config.pluginsdir,
++     Config.preludesdir,
++     Config.datadir,
++     Config.mandir)
++  | opam_switch_prefix ->
++    let libdir = Filename.concat opam_switch_prefix "lib" in
++    let pluginsdir =
++      Filename.concat opam_switch_prefix "lib/alt-ergo/plugins" in
++    let preludesdir =
++      Filename.concat opam_switch_prefix "share/alt-ergo/preludes" in
++    let datadir = Filename.concat opam_switch_prefix "share" in
++    let mandir = Filename.concat opam_switch_prefix "man" in
++    (libdir,
++     pluginsdir,
++     preludesdir,
++     datadir,
++     mandir)
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' alt-ergo.2.3.2-orig/lib/util/options.ml alt-ergo.2.3.2-reloc/lib/util/options.ml
+--- alt-ergo.2.3.2-orig/lib/util/options.ml	2020-03-24 15:11:53.000000000 +0100
++++ alt-ergo.2.3.2-reloc/lib/util/options.ml	2020-08-01 21:31:05.615934712 +0200
+@@ -139,11 +139,11 @@
+     | "" -> ()
+     | s ->
+       let path = match s with
+-        | "lib" -> Config.libdir
+-        | "plugins" -> Config.pluginsdir
+-        | "preludes" -> Config.preludesdir
+-        | "data" -> Config.datadir
+-        | "man" -> Config.mandir
++        | "lib" -> Config_reloc.libdir
++        | "plugins" -> Config_reloc.pluginsdir
++        | "preludes" -> Config_reloc.preludesdir
++        | "data" -> Config_reloc.datadir
++        | "man" -> Config_reloc.mandir
+         | s -> raise (Arg.Bad ("Option -where has no argument " ^ s))
+       in
+       Format.printf "%s@." path; exit 0
+@@ -977,4 +977,3 @@
+   | None ->
+     Format.eprintf "Error in Options.get_is_gui: is_gui is not set!@.";
+     assert false
+-
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' alt-ergo.2.3.2-orig/parsers/parsers_loader.ml alt-ergo.2.3.2-reloc/parsers/parsers_loader.ml
+--- alt-ergo.2.3.2-orig/parsers/parsers_loader.ml	2020-03-24 15:11:53.000000000 +0100
++++ alt-ergo.2.3.2-reloc/parsers/parsers_loader.ml	2020-08-01 21:31:05.619934794 +0200
+@@ -26,10 +26,10 @@
+            eprintf ">> Failure message: %s@.@." (MyDynlink.error_message m1);
+          end;
+ 
+-         let pp = sprintf "%s/%s" Config.pluginsdir p in
++         let pp = sprintf "%s/%s" Config_reloc.pluginsdir p in
+          if verbose () then
+            eprintf "[Dynlink] Loading the parser in %S ... with prefix %S@."
+-             p Config.pluginsdir;
++             p Config_reloc.pluginsdir;
+          try
+            MyDynlink.loadfile pp;
+            if verbose () then  eprintf "Success !@.@."
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' alt-ergo.2.3.2-orig/parsers/parsers.ml alt-ergo.2.3.2-reloc/parsers/parsers.ml
+--- alt-ergo.2.3.2-orig/parsers/parsers.ml	2020-03-24 15:11:53.000000000 +0100
++++ alt-ergo.2.3.2-reloc/parsers/parsers.ml	2020-08-01 21:31:05.619934794 +0200
+@@ -155,7 +155,7 @@
+     (fun acc prelude ->
+        let prelude =
+          if Sys.file_exists prelude then prelude
+-         else Config.preludesdir ^ "/" ^ prelude
++         else Config_reloc.preludesdir ^ "/" ^ prelude
+        in
+        List.rev_append (List.rev (parse_input_file prelude)) acc)
+     acc (List.rev preludes)
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' alt-ergo.2.3.2-orig/tools/gui/main_gui.ml alt-ergo.2.3.2-reloc/tools/gui/main_gui.ml
+--- alt-ergo.2.3.2-orig/tools/gui/main_gui.ml	2020-03-24 15:11:53.000000000 +0100
++++ alt-ergo.2.3.2-reloc/tools/gui/main_gui.ml	2020-08-01 21:31:05.619934794 +0200
+@@ -983,7 +983,7 @@
+   let lmanager = GSourceView2.source_language_manager ~default:true in
+   lmanager#set_search_path
+     (String.concat Filename.dir_sep
+-       [Config.datadir; "gtksourceview-2.0"; "language-specs"] ::
++       [Config_reloc.datadir; "gtksourceview-2.0"; "language-specs"] ::
+      lmanager#search_path);
+   let source_language = lmanager#language "alt-ergo" in
+ 
