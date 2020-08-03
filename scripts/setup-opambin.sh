@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# ./scripts/test-versions.sh ocaml-base-compiler 4.07.1
+#    will test this version
+#
+# ./scripts/test-versions.sh ocaml-base-compiler
+#    will test all versions
+
 source ./env.sh
 
 RED='\033[0;31m'
@@ -12,10 +18,17 @@ function call {
 
 CURDIR=$(pwd)
 
+echo OPAMROOT=$OPAMROOT
+
 if [ -d $OPAMROOT ]; then
     cd $OPAMROOT
     if [ -d download-cache ]; then
-       call tar cf $CURDIR/download-cache.tar download-cache
+
+        if [ -f $CURDIR/download-cache.tar ]; then
+            call tar xf $CURDIR/download-cache.tar
+        fi
+
+        call tar cf $CURDIR/download-cache.tar download-cache
     fi
     cd $CURDIR
     call rm -rf $OPAMROOT

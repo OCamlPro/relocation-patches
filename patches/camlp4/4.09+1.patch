@@ -1,0 +1,62 @@
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' camlp4.4.09+1-orig/camlp4/config/gen_import.ml camlp4.4.09+1-reloc/camlp4/config/gen_import.ml
+--- camlp4.4.09+1-orig/camlp4/config/gen_import.ml	2020-04-01 13:28:52.000000000 +0200
++++ camlp4.4.09+1-reloc/camlp4/config/gen_import.ml	2020-08-02 18:35:46.178993642 +0200
+@@ -3,14 +3,21 @@
+
+ let () =
+   let oc = open_out "camlp4/config/Camlp4_import.ml" in
+-  Printf.fprintf oc "\
+-let standard_library = %S
++  Printf.fprintf oc {|
+ let ast_intf_magic_number = %S
+ let ast_impl_magic_number = %S
++let standard_library = %S
+ let camlp4_standard_library = %S
+-"
+-    Config.standard_library
++
++let ( standard_library, camlp4_standard_library ) =
++  match Sys.getenv "OPAM_SWITCH_PREFIX" with
++  | exception _ -> ( standard_library, camlp4_standard_library )
++  | p ->
++    let p = String.map (function '\\' -> '/' | c -> c) p in
++    ( p ^ "/lib/ocaml", p ^ "/lib/ocaml/camlp4" )
++|}
+     Config.ast_intf_magic_number
+     Config.ast_impl_magic_number
++    Config.standard_library
+     (Filename.concat Sys.argv.(1) "camlp4");
+   close_out oc
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' camlp4.4.09+1-orig/configure camlp4.4.09+1-reloc/configure
+--- camlp4.4.09+1-orig/configure	2020-04-01 13:28:52.000000000 +0200
++++ camlp4.4.09+1-reloc/configure	2020-08-02 18:23:43.028379479 +0200
+@@ -100,3 +100,5 @@
+ let pkgdir="$PKGDIR"
+ let ocamlnat=$OCAMLNAT
+ EOF
++
++cat myocamlbuild_reloc.ml >> myocamlbuild_config.ml
+diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' camlp4.4.09+1-orig/myocamlbuild_reloc.ml camlp4.4.09+1-reloc/myocamlbuild_reloc.ml
+--- camlp4.4.09+1-orig/myocamlbuild_reloc.ml	1970-01-01 01:00:00.000000000 +0100
++++ camlp4.4.09+1-reloc/myocamlbuild_reloc.ml	2020-08-02 18:30:00.115994698 +0200
+@@ -0,0 +1,20 @@
++
++let ( libdir,
++      bindir,
++      pkgdir,
++      standard_library
++    ) =
++  match Sys.getenv "OPAM_SWITCH_PREFIX" with
++  | exception _ ->
++      ( libdir,
++        bindir,
++        pkgdir,
++        standard_library
++      )
++  | p ->
++      let p = String.map (function '\\' -> '/' | c -> c) p in
++      ( p ^ "/lib/ocaml",
++        p ^ "/bin",
++        p ^ "/lib",
++        p ^ "/lib/ocaml"
++      )

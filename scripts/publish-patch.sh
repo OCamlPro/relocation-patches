@@ -34,4 +34,8 @@ if [ -f $VERSION.patch ]; then
     PATCH_DIR=$PATCHES_DIR/patches/$NAME
     call mkdir -p $PATCH_DIR
     call cp -f $VERSION.patch $PATCH_DIR/$VERSION.patch
+elif [ -f "$VERSION=.patch" ]; then
+    PATCH_DIR=$PATCHES_DIR/patches/$NAME
+    call mkdir -p $PATCH_DIR
+    call cp -f "$VERSION=.patch" "$PATCH_DIR/$VERSION=.patch"
 fi
