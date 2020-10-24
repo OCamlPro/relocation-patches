@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# ./scripts/prepare-package.sh NAME VERSION [PATCH_VERSION]
+
 source ./env.sh
 
 RED='\033[0;31m'
@@ -24,12 +26,13 @@ function call_safe {
 
 NAME=$1
 VERSION=$2
+PATCHVERSION=$3
 NV=$NAME.$VERSION
 
 echo Package $NV
 
 CURDIR=$(pwd)
-export OPAMROOT=$CURDIR/root
+#export OPAMROOT=$CURDIR/TEST/_tmp/root
 
 call mkdir -p work
 cd work
@@ -53,7 +56,13 @@ if [ -f $PATCH ]; then
     echo Found relocation patch !
     call cp $PATCH $VERSION.patch
 else
+  PATCH=$PATCHES_DIR/patches/$NAME/$PATCHVERSION.patch
+  if [ -f $PATCH ]; then
+    echo Found relocation patch !
+    call cp $PATCH $VERSION.patch
+  else
     echo No patch $PATCH
+  fi
 fi
 
 ./reapply-patch.sh

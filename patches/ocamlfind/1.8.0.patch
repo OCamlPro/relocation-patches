@@ -83,7 +83,7 @@ diff -r -u -N -x '*~' -x '*.orig' -x '*.rej' ocamlfind.1.8.0-orig/src/findlib/fr
 +                 (Findlib.ocaml_stdlib ())
 +                 (String.sub line 1 ((String.length line) - 1))
 +             in
-+             Printf.eprintf "ldconf+ %s\n%!" line;
++             ();
 +             line
 +           else
 +             line) :: !lines
