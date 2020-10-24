@@ -1,0 +1,364 @@
+diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocaml-base-compiler.4.02.0-orig/bytecomp/dll.ml ocaml-base-compiler.4.02.0-reloc/bytecomp/dll.ml
+--- ocaml-base-compiler.4.02.0-orig/bytecomp/dll.ml	2014-05-09 14:01:21.000000000 +0200
++++ ocaml-base-compiler.4.02.0-reloc/bytecomp/dll.ml	2020-10-24 22:02:54.151082578 +0200
+@@ -118,7 +118,16 @@
+     let ic = open_in (Filename.concat Config.standard_library "ld.conf") in
+     begin try
+       while true do
+-        path := input_line ic :: !path
++        let line = input_line ic in
++        let len = String.length line in
++        let line =
++          if len > 0 && line.[0] = '+' then
++            Filename.concat
++              Config.standard_library
++              (String.sub line 1 (len - 1))
++          else
++            line in
++        path := line :: !path
+       done
+     with End_of_file -> ()
+     end;
+diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocaml-base-compiler.4.02.0-orig/byterun/dynlink.c ocaml-base-compiler.4.02.0-reloc/byterun/dynlink.c
+--- ocaml-base-compiler.4.02.0-orig/byterun/dynlink.c	2014-04-15 19:09:13.000000000 +0200
++++ ocaml-base-compiler.4.02.0-reloc/byterun/dynlink.c	2020-10-24 22:03:46.452111706 +0200
+@@ -13,6 +13,7 @@
+ 
+ /* Dynamic loading of C primitives. */
+ 
++#include <stdio.h>
+ #include <stddef.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -31,6 +32,26 @@
+ #include "osdeps.h"
+ #include "prims.h"
+ 
++/* to keep the same patch... */
++#define T(x) x
++#define char_os char
++#define caml_stat_strconcat_os caml_strconcat
++#define caml_stat_strdup_of_os caml_strdup
++
++int debug_dynlink = 0;
++#define DLLPRINTF(...) if(debug_dynlink) fprintf (stderr, __VA_ARGS__)
++
++static void init_debug_dynlink(){
++  static int init_debug_dynlink = 1;
++
++  if( init_debug_dynlink ){
++    init_debug_dynlink = 0;
++    char_os *s = getenv(T("OCAML_DEBUG_DLL"));
++    if( s != NULL ) debug_dynlink = 1;
++    DLLPRINTF("dll debug started\n");
++  }
++}
++
+ #ifndef NATIVE_CODE
+ 
+ /* The table of primitives */
+@@ -75,9 +96,17 @@
+   char * stdlib, * ldconfname, * config, * p, * q;
+   struct stat st;
+   int ldconf, nread;
++  int must_free_stdlib = 0;
+ 
+   stdlib = getenv("OCAMLLIB");
+   if (stdlib == NULL) stdlib = getenv("CAMLLIB");
++  if (stdlib == NULL) {
++    char_os *opam_prefix = getenv(T("OPAM_SWITCH_PREFIX"));
++    if( opam_prefix != NULL ){
++      stdlib = caml_stat_strconcat_os(3, opam_prefix, T("/"), T("lib/ocaml"));
++      must_free_stdlib = 1;
++    }
++  }
+   if (stdlib == NULL) stdlib = OCAML_STDLIB_DIR;
+   ldconfname = caml_strconcat(3, stdlib, "/", LD_CONF_NAME);
+   if (stat(ldconfname, &st) == -1) {
+@@ -99,12 +128,19 @@
+   for (p = config; *p != 0; p++) {
+     if (*p == '\n') {
+       *p = 0;
++      if( *q == '+' ){
++        char_os* dest = caml_stat_strconcat_os(3, stdlib, T("/"), q+1);
++	DLLPRINTF("+dest: '%s'\n", caml_stat_strdup_of_os(dest));
++        caml_ext_table_add(&caml_shared_libs_path, dest);
++      } else {
+       caml_ext_table_add(&caml_shared_libs_path, q);
++      }
+       q = p + 1;
+     }
+   }
+   if (q < p) caml_ext_table_add(&caml_shared_libs_path, q);
+   close(ldconf);
++  if(must_free_stdlib) caml_stat_free(stdlib);
+   caml_stat_free(ldconfname);
+   return config;
+ }
+@@ -116,6 +152,7 @@
+   char * realname;
+   void * handle;
+ 
++  init_debug_dynlink();
+   realname = caml_search_dll_in_path(&caml_shared_libs_path, name);
+   caml_gc_message(0x100, "Loading shared library %s\n",
+                   (uintnat) realname);
+diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocaml-base-compiler.4.02.0-orig/byterun/Makefile.common ocaml-base-compiler.4.02.0-reloc/byterun/Makefile.common
+--- ocaml-base-compiler.4.02.0-orig/byterun/Makefile.common	2014-07-21 22:34:38.000000000 +0200
++++ ocaml-base-compiler.4.02.0-reloc/byterun/Makefile.common	2020-10-24 22:02:54.151082578 +0200
+@@ -46,8 +46,8 @@
+ .PHONY: all-runtimed
+ 
+ ld.conf: ../config/Makefile
+-	echo "$(STUBLIBDIR)" > ld.conf
+-	echo "$(LIBDIR)" >> ld.conf
++	echo "+stublibs" > $@
++	echo "+" >> $@
+ 
+ # Installation
+ 
+diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocaml-base-compiler.4.02.0-orig/byterun/win32.c ocaml-base-compiler.4.02.0-reloc/byterun/win32.c
+--- ocaml-base-compiler.4.02.0-orig/byterun/win32.c	2014-05-21 17:08:11.000000000 +0200
++++ ocaml-base-compiler.4.02.0-reloc/byterun/win32.c	2020-10-24 22:02:54.151082578 +0200
+@@ -57,26 +57,34 @@
+   return p;
+ }
+ 
++extern int debug_dynlink;
++#define DLLPRINTF(...) if(debug_dynlink) fprintf (stderr, __VA_ARGS__)
++
+ char * caml_search_in_path(struct ext_table * path, char * name)
+ {
+   char * p, * dir, * fullname;
+   int i;
+   struct stat st;
+ 
++  DLLPRINTF("Searching for %s\n", caml_stat_strdup_of_utf16(name));
+   for (p = name; *p != 0; p++) {
+     if (*p == '/' || *p == '\\') goto not_found;
+   }
+   for (i = 0; i < path->size; i++) {
+     dir = path->contents[i];
++    DLLPRINTF("  Trying %s\n", caml_stat_strdup_of_utf16(dir));
+     if (dir[0] == 0) continue;
+          /* not sure what empty path components mean under Windows */
+     fullname = caml_strconcat(3, dir, "\\", name);
+     caml_gc_message(0x100, "Searching %s\n", (uintnat) fullname);
+-    if (stat(fullname, &st) == 0 && S_ISREG(st.st_mode))
++    if (stat(fullname, &st) == 0 && S_ISREG(st.st_mode)){
++      DLLPRINTF("  Found file %s\n", caml_stat_strdup_of_utf16(fullname));
+       return fullname;
++    }
+     caml_stat_free(fullname);
+   }
+  not_found:
++  DLLPRINTF("  Not found.\n");
+   caml_gc_message(0x100, "%s not found in search path\n", (uintnat) name);
+   return caml_strdup(name);
+ }
+diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocaml-base-compiler.4.02.0-orig/stdlib/Makefile ocaml-base-compiler.4.02.0-reloc/stdlib/Makefile
+--- ocaml-base-compiler.4.02.0-orig/stdlib/Makefile	2014-04-12 12:17:02.000000000 +0200
++++ ocaml-base-compiler.4.02.0-reloc/stdlib/Makefile	2020-10-24 22:02:54.151082578 +0200
+@@ -47,18 +47,18 @@
+ 
+ camlheader camlheaderd camlheader_ur: header.c ../config/Makefile
+ 	if $(SHARPBANGSCRIPTS); then \
+-	  echo '#!$(BINDIR)/ocamlrun' > camlheader && \
+-	  echo '#!$(BINDIR)/ocamlrund' > camlheaderd && \
++	  echo '#!/usr/bin/env ocamlrun' > camlheader && \
++	  echo '#!/usr/bin/env ocamlrund' > camlheaderd && \
+ 	  echo '#!' | tr -d '\012' > camlheader_ur; \
+ 	else \
+ 	  $(BYTECC) $(BYTECCCOMPOPTS) $(BYTECCLINKOPTS) \
+-	            -DRUNTIME_NAME='"$(BINDIR)/ocamlrun"' \
++	            -DRUNTIME_NAME='"ocamlrun"' \
+ 	            header.c -o tmpheader$(EXE) && \
+ 	  strip tmpheader$(EXE) && \
+ 	  mv tmpheader$(EXE) camlheader && \
+ 	  cp camlheader camlheader_ur && \
+ 	  $(BYTECC) $(BYTECCCOMPOPTS) $(BYTECCLINKOPTS) \
+-	            -DRUNTIME_NAME='"$(BINDIR)/ocamlrund"' \
++	            -DRUNTIME_NAME='"ocamlrund"' \
+ 	            header.c -o tmpheader$(EXE) && \
+ 	  strip tmpheader$(EXE) && \
+ 	  mv tmpheader$(EXE) camlheaderd; \
+diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocaml-base-compiler.4.02.0-orig/tools/Makefile.shared ocaml-base-compiler.4.02.0-reloc/tools/Makefile.shared
+--- ocaml-base-compiler.4.02.0-orig/tools/Makefile.shared	2014-08-07 10:52:02.000000000 +0200
++++ ocaml-base-compiler.4.02.0-reloc/tools/Makefile.shared	2020-10-24 22:02:54.151082578 +0200
+@@ -107,8 +107,7 @@
+ 	rm -f ocamlmklib
+ 
+ ocamlmklibconfig.ml: ../config/Makefile
+-	(echo 'let bindir = "$(BINDIR)"'; \
+-         echo 'let ext_lib = "$(EXT_LIB)"'; \
++	(echo 'let ext_lib = "$(EXT_LIB)"'; \
+          echo 'let ext_dll = "$(EXT_DLL)"'; \
+          echo 'let supports_shared_libraries = $(SUPPORTS_SHARED_LIBRARIES)';\
+          echo 'let mkdll = "$(MKDLL)"'; \
+diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocaml-base-compiler.4.02.0-orig/tools/ocamlmklib.ml ocaml-base-compiler.4.02.0-reloc/tools/ocamlmklib.ml
+--- ocaml-base-compiler.4.02.0-orig/tools/ocamlmklib.ml	2014-04-29 13:56:17.000000000 +0200
++++ ocaml-base-compiler.4.02.0-reloc/tools/ocamlmklib.ml	2020-10-24 22:02:54.151082578 +0200
+@@ -15,8 +15,7 @@
+ 
+ (* PR#4783: under Windows, don't use absolute paths because we do
+    not know where the binary distribution will be installed. *)
+-let compiler_path name =
+-  if Sys.os_type = "Win32" then name else Filename.concat bindir name
++let compiler_path name = name
+ 
+ let bytecode_objs = ref []  (* .cmo,.cma,.ml,.mli files to pass to ocamlc *)
+ and native_objs = ref []    (* .cmx,.cmxa,.ml,.mli files to pass to ocamlopt *)
+diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocaml-base-compiler.4.02.0-orig/toplevel/topdirs.ml ocaml-base-compiler.4.02.0-reloc/toplevel/topdirs.ml
+--- ocaml-base-compiler.4.02.0-orig/toplevel/topdirs.ml	2014-05-13 16:36:19.000000000 +0200
++++ ocaml-base-compiler.4.02.0-reloc/toplevel/topdirs.ml	2020-10-24 22:02:54.151082578 +0200
+@@ -98,6 +98,7 @@
+   end
+ 
+ let rec load_file recursive ppf name =
++  let name = expand_directory Config.standard_library name in
+   let filename =
+     try Some (find_in_path !Config.load_path name) with Not_found -> None
+   in
+diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocaml-base-compiler.4.02.0-orig/utils/config.mlp ocaml-base-compiler.4.02.0-reloc/utils/config.mlp
+--- ocaml-base-compiler.4.02.0-orig/utils/config.mlp	2014-05-07 02:34:20.000000000 +0200
++++ ocaml-base-compiler.4.02.0-reloc/utils/config.mlp	2020-10-24 22:02:54.151082578 +0200
+@@ -88,6 +88,139 @@
+ let host = "%%HOST%%"
+ let target = "%%TARGET%%"
+ 
++module Relocate = struct
++  (* OCamlPro SAS *)
++
++  (*
++    Find the ocaml library directory relatively to the path of the command.
++    We use two strategies:
++    * If OPAM_SWITCH_PREFIX is defined, we use it, with "lib/ocaml" appended.
++    It should work for packages like ppx_tools that link the compilerlibs
++    and call their tool in its build directory, i.e. with a wrong relative
++    path to the standard library.
++    * Otherwise, it's "../../lib/ocaml" appended to the name of the
++    command. We simplify and normalize the filename, hopefully in a
++    Windows-compatible way.
++  *)
++
++let find_in_path path name =
++  if not (Filename.is_implicit name) then
++    if Sys.file_exists name then name else raise Not_found
++  else begin
++    let rec try_dir = function
++    [] -> raise Not_found
++      | dir::rem ->
++        let fullname = Filename.concat dir name in
++        if Sys.file_exists fullname then fullname else try_dir rem
++    in try_dir path
++  end
++
++  (* split a string [s] at every char [c], and return the list of sub-strings *)
++let split s c =
++  let len = String.length s in
++  let rec iter pos to_rev =
++    if pos = len then List.rev ("" :: to_rev) else
++      match try
++              Some ( String.index_from s pos c )
++        with Not_found -> None
++      with
++          Some pos2 ->
++            if pos2 = pos then iter (pos+1) ("" :: to_rev) else
++              iter (pos2+1) ((String.sub s pos (pos2-pos)) :: to_rev)
++        | None -> List.rev ( String.sub s pos (len-pos) :: to_rev )
++  in
++  iter 0 []
++
++let simplify path =
++  let rec simplify path rev =
++    match path with
++      | [] -> List.rev rev
++      | ".." :: path ->
++        begin
++          match rev with
++            | [] -> simplify path rev
++            | _ :: rev -> simplify path rev
++        end
++      | "." :: path -> simplify path rev
++      | "" :: path -> simplify path rev
++      | dir :: path -> simplify path ( dir :: rev )
++  in
++  simplify path []
++
++let slashify =
++  if Sys.win32 then
++    fun s -> String.map ( fun x -> if x = '\\' then '/' else x ) s
++  else
++    fun id -> id
++
++let normalize_filename filename =
++
++    (* make relative path absolute *)
++  let filename =
++    if Filename.is_relative filename then
++      Filename.concat (Sys.getcwd ()) filename
++    else
++      filename
++  in
++
++  let filename = slashify filename in
++  let len = String.length filename in
++
++  let path = split filename '/' in
++
++  let has_leading_slash = len > 0 && filename.[0] = '/' in
++  if has_leading_slash then
++    String.concat "/" ("" :: simplify path)
++  else
++    match path with
++      | [] -> assert false
++      | partition :: path ->
++        String.concat "/" (partition :: simplify path)
++
++  (* When called from the Windows shell, Sys.executable_name is not
++     correct, we have to search it again in the PATH to make it
++     absolute. *)
++let path_sep = if Sys.win32 then ';' else ':'
++let env_path =
++  try
++    split (Sys.getenv "PATH") path_sep
++  with Not_found -> []
++
++let standard_library_default =
++  match Sys.getenv "OPAM_SWITCH_PREFIX" with
++    | dirname ->
++      Filename.concat dirname "lib/ocaml"
++    | exception Not_found ->
++        let executable_name =
++          let executable_name = Sys.executable_name in
++          if Filename.is_implicit executable_name then
++            let executable_name =
++              if Sys.win32 &&
++                 not ( Filename.check_suffix executable_name ".exe" ) then
++                executable_name ^ ".exe" else
++                executable_name in
++            try
++              find_in_path env_path executable_name
++            with Not_found ->
++              executable_name
++          else
++            executable_name
++        in
++        normalize_filename
++          ( executable_name ^ "/../../lib/ocaml" )
++
++end
++
++let standard_library =
++  ignore ( standard_library ); (* avoid warning *)
++  try
++    Relocate.slashify ( Sys.getenv "OCAMLLIB" )
++  with Not_found ->
++  try
++    Relocate.slashify ( Sys.getenv "CAMLLIB" )
++  with Not_found ->
++    Relocate.standard_library_default
++
+ let default_executable_name =
+   match Sys.os_type with
+     "Unix" -> "a.out"
