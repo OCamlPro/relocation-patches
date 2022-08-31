@@ -97,3 +97,70 @@ Most of the sources of errors with relocatable packages are:
   the file (and ideally to remove the autolink reference). If the package
   installs files in a non-standard path, a solution is to move them back
   to the standard path (<$OPAM_SWITCH_PREFIX/lib/$PACKAGE_NAME>)
+
+For OCaml compilers
+-------------------
+
+Patches are in patches/ocaml-base-compiler/. Take the last one and
+apply it to the version you want.
+
+Download sources from https://github.com/ocaml/ocaml/releases
+
+```
+export OCAMLVERSION=4.13.0
+```
+
+Create 2 directories ocaml-$OCAMLVERSION and ocaml-$OCAMLVERSION-orig
+from sources.
+
+```
+tar zxf ~/Downloads/ocaml-$OCAMLVERSION.tar.gz
+mv ocaml-$OCAMLVERSION ocaml-$OCAMLVERSION-orig
+tar zxf ~/Downloads/ocaml-$OCAMLVERSION.tar.gz
+```
+
+Apply the patch in "ocaml-$OCAMLVERSION" source directory.
+
+```
+cd ocaml-$OCAMLVERSION
+patch -p1 < ../../relocation-patches/patches/ocaml-base-compiler/4.10.0.patch
+```
+
+Configure, build and install with:
+
+```
+export OPAM_SWITCH_PREFIX=$HOME/.opam/$OCAMLVERSION-test
+./configure --prefix $HOME/.opam/$OCAMLVERSION-test
+make
+make install
+```
+
+
+After installation, move it to the opam switch, and remove it (to
+prevent the compiler from using the former unmoved files):
+
+```
+opam bin config --disable
+opam switch create $OCAMLVERSION-reloc $OCAMLVERSION
+cp -dpR $HOME/.opam/$OCAMLVERSION-test/. $HOME/.opam/$OCAMLVERSION-reloc/.
+rm -rf $HOME/.opam/$OCAMLVERSION-test/
+```
+
+Try to install something:
+```
+opam install core
+```
+
+If it works, re-enable opam-bin:
+
+```
+opam bin config --patches-url=file://$HOME/GIT/ocp/public-github/relocation-patches
+opam bin config --enable
+```
+
+Create a new patch:
+
+```
+diff -r -u  -x '*~' -x '*.orig' -x '*.rej' ocaml-4.13.0-orig ocaml-4.13.0 | grep -v 'Only in ocaml-4' > 4.13.0.patch                                            ```
+
+
