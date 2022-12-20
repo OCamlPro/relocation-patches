@@ -161,6 +161,34 @@ opam bin config --enable
 Create a new patch:
 
 ```
-diff -r -u  -x '*~' -x '*.orig' -x '*.rej' ocaml-4.13.0-orig ocaml-4.13.0 | grep -v 'Only in ocaml-4' > 4.13.0.patch                                            ```
+diff -r -u  -x '*~' -x '*.orig' -x '*.rej' ocaml-$OCAMLVERSION-orig ocaml-$OCAMLVERSION | grep -v 'Only in ocaml-4' > $OCAMLVERSION.patch
+```
 
+## Example for OCaml 5.09.0
 
+```
+export OCAMLVERSION=5.0.0
+export OPAMROOT=$HOME/opam-root
+opam init --bare -n
+opam switch create $OCAMLVERSION
+mv $OPAMROOT/$OCAMLVERSION $OPAMROOT/$OCAMLVERSION-backup
+
+tar zxf ocaml-$OCAMLVERSION.tar.gz
+mv ocaml-$OCAMLVERSION ocaml-$OCAMLVERSION-orig
+tar zxf ocaml-$OCAMLVERSION.tar.gz
+cd ocaml-$OCAMLVERSION
+patch -p1 < ../../patches/ocaml-base-compiler/4.14.0.patch
+export OPAM_SWITCH_PREFIX=$OPAMROOT/$OCAMLVERSION-test
+./configure --prefix $OPAMROOT/$OCAMLVERSION-test
+make
+make install
+cd ..
+
+cp -dpR $OPAMROOT/$OCAMLVERSION-test $OPAMROOT/$OCAMLVERSION
+cp -dpr $OPAMROOT/$OCAMLVERSION-backup/.opam-switch $OPAMROOT/$OCAMLVERSION/.opam-switch
+opam switch $OCAMLVERSION
+opam install core
+
+diff -r -u  -x '*~' -x '*.orig' -x '*.rej' ocaml-$OCAMLVERSION-orig ocaml-$OCAMLVERSION | grep -v 'Only in ocaml-' > $OCAMLVERSION.patch
+cp $OCAMLVERSION.patch ../patches/ocaml-base-compiler/
+```
