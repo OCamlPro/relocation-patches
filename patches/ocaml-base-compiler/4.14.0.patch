@@ -123,7 +123,7 @@ diff -r -u -x '*~' -x '*.orig' -x '*.rej' ocaml-4.14.0-orig/runtime/Makefile oca
 +++ ocaml-4.14.0/runtime/Makefile	2022-08-31 16:51:07.770605300 +0200
 @@ -190,8 +190,10 @@
  # Generated non-object files
- 
+
  ld.conf: $(ROOTDIR)/Makefile.config
 -	echo "$(STUBLIBDIR)" > $@
 -	echo "$(LIBDIR)" >> $@
@@ -131,7 +131,7 @@ diff -r -u -x '*~' -x '*.orig' -x '*.rej' ocaml-4.14.0-orig/runtime/Makefile oca
 +	echo "+" >> $@
 +#	echo "$(STUBLIBDIR)" > $@
 +#	echo "$(LIBDIR)" >> $@
- 
+
  # If primitives contain duplicated lines (e.g. because the code is defined
  # like
 diff -r -u -x '*~' -x '*.orig' -x '*.rej' ocaml-4.14.0-orig/runtime/unix.c ocaml-4.14.0/runtime/unix.c
@@ -153,7 +153,7 @@ diff -r -u -x '*~' -x '*.orig' -x '*.rej' ocaml-4.14.0-orig/runtime/win32.c ocam
 @@ -150,6 +150,10 @@
    return p;
  }
- 
+
 +
 +extern int debug_dynlink;
 +#define DLLPRINTF(...) if(debug_dynlink) fprintf (stderr, __VA_ARGS__)
@@ -203,7 +203,7 @@ diff -r -u -x '*~' -x '*.orig' -x '*.rej' ocaml-4.14.0-orig/stdlib/Makefile ocam
 -	echo '#!$(BINDIR)/ocamlrun$(subst er,,$*)' > $@
 +	echo '#!/usr/bin/env ocamlrun$(subst er,,$*)' > $@
  endif
- 
+
  # TODO This does not take long shebangs into account (since TARGET_BINDIR is not
  #      yet processed by configure)
  target_%: $(ROOTDIR)/Makefile.config Makefile
@@ -249,7 +249,152 @@ diff -r -u -x '*~' -x '*.orig' -x '*.rej' ocaml-4.14.0-orig/toplevel/native/tope
 diff -r -u -x '*~' -x '*.orig' -x '*.rej' ocaml-4.14.0-orig/utils/config.mlp ocaml-4.14.0/utils/config.mlp
 --- ocaml-4.14.0-orig/utils/config.mlp	2022-03-28 14:27:36.000000000 +0200
 +++ ocaml-4.14.0/utils/config.mlp	2022-08-31 16:51:07.774605307 +0200
-@@ -143,6 +143,139 @@
+@@ -17,31 +17,107 @@
+ (* The main OCaml version string has moved to ../VERSION *)
+ let version = Sys.ocaml_version
+ 
+-let bindir = "%%BINDIR%%"
++module Config_file : sig
++  type value
++  val standard_library_default : value option
++  val standard_library : value option
++  val ccomp_type : value option
++  val c_compiler : value option
++  val ocamlc_cflags : value option
++  val ocamlc_cppflags : value option
++  val ocamlopt_cflags : value option
++  val ocamlopt_cppflags : value option
++  val bytecomp_c_libraries : value option
++  val native_c_libraries : value option
++  val native_pack_linker : value option
++  val asm : value option
++  val find_default : value option -> string -> string
++end = struct
++
++  type value = string
++
++  exception Bad_format
++
++  let parse_config_line line =
++    let line = String.trim line in
++    if String.length line = 0
++       || line.[0] = '#'
++    then None
++    else
++      match String.split_on_char ':' line with
++      | variable :: value ->
++        Some (variable, String.trim @@ String.concat ":" value)
++      | _ -> raise Bad_format
++
++  let parse_config file =
++    let ic = open_in file in
++    let lines = ref [] in
++    begin
++      try
++        while true do
++          lines := input_line ic :: !lines
++        done
++      with End_of_file -> lines := List.rev !lines;
++    end;
++    List.filter_map parse_config_line !lines
+ 
+-let standard_library_default = "%%LIBDIR%%"
++  let config : (string * string) list =
++    try
++      let path =
++        try
++          Sys.getenv "OCAML_CONFIG"
++        with Not_found ->
++          let home = Sys.getenv "HOME" in
++          Filename.concat home ".ocamlup/ocaml.config"
++      in
++      parse_config path
++    with _ -> []
+ 
+-let standard_library =
+-  try
+-    Sys.getenv "OCAMLLIB"
+-  with Not_found ->
+-  try
+-    Sys.getenv "CAMLLIB"
+-  with Not_found ->
+-    standard_library_default
++  let standard_library_default = List.assoc_opt "standard_library_default" config
++
++  let standard_library = List.assoc_opt "standard_library" config
++
++  let ccomp_type = List.assoc_opt "ccomp_type" config
++
++  let c_compiler = List.assoc_opt "c_compiler" config
++
++  let ocamlc_cflags = List.assoc_opt "ocamlc_cflags" config
++
++  let ocamlc_cppflags = List.assoc_opt "ocamlc_cppflags" config
++
++  let ocamlopt_cflags = List.assoc_opt "ocamlopt_cflags" config
++
++  let ocamlopt_cppflags = List.assoc_opt "ocamlopt_cppflags" config
++
++  let bytecomp_c_libraries = List.assoc_opt "bytecomp_c_libraries" config
++
++  let native_c_libraries = List.assoc_opt "native_c_libraries" config
++
++  let native_pack_linker = List.assoc_opt "native_pack_linker" config
++
++  let asm = List.assoc_opt "asm" config
++
++  let find_default conf_item default =
++    match conf_item with
++    | Some item -> item
++    | None -> default
+ 
+-let ccomp_type = "%%CCOMPTYPE%%"
+-let c_compiler = "%%CC%%"
++end
++
++let bindir = "%%BINDIR%%"
++
++let ccomp_type = Config_file.(find_default ccomp_type "%%CCOMPTYPE%%")
++let c_compiler = Config_file.(find_default c_compiler "%%CC%%")
+ let c_output_obj = "%%OUTPUTOBJ%%"
+ let c_has_debug_prefix_map = %%CC_HAS_DEBUG_PREFIX_MAP%%
+ let as_has_debug_prefix_map = %%AS_HAS_DEBUG_PREFIX_MAP%%
+-let ocamlc_cflags = "%%OCAMLC_CFLAGS%%"
+-let ocamlc_cppflags = "%%OCAMLC_CPPFLAGS%%"
++let ocamlc_cflags = Config_file.(find_default ocamlc_cflags "%%OCAMLC_CFLAGS%%")
++let ocamlc_cppflags = Config_file.(find_default ocamlc_cppflags "%%OCAMLC_CPPFLAGS%%")
+ (* #7678: ocamlopt uses these only to compile .c files, and the behaviour for
+           the two drivers should be identical. *)
+-let ocamlopt_cflags = "%%OCAMLC_CFLAGS%%"
+-let ocamlopt_cppflags = "%%OCAMLOPT_CPPFLAGS%%"
+-let bytecomp_c_libraries = "%%BYTECCLIBS%%"
++let ocamlopt_cflags = Config_file.(find_default ocamlopt_cflags "%%OCAMLC_CFLAGS%%")
++let ocamlopt_cppflags = Config_file.(find_default ocamlopt_cppflags "%%OCAMLOPT_CPPFLAGS%%")
++let bytecomp_c_libraries = Config_file.(find_default bytecomp_c_libraries "%%BYTECCLIBS%%")
+ (* bytecomp_c_compiler and native_c_compiler have been supported for a
+    long time and are retained for backwards compatibility.
+    For programs that don't need compatibility with older OCaml releases
+@@ -52,8 +128,8 @@
+   c_compiler ^ " " ^ ocamlc_cflags ^ " " ^ ocamlc_cppflags
+ let native_c_compiler =
+   c_compiler ^ " " ^ ocamlopt_cflags ^ " " ^ ocamlopt_cppflags
+-let native_c_libraries = "%%NATIVECCLIBS%%"
+-let native_pack_linker = "%%PACKLD%%"
++let native_c_libraries = Config_file.(find_default native_c_libraries "%%NATIVECCLIBS%%")
++let native_pack_linker = Config_file.(find_default native_pack_linker "%%PACKLD%%")
+ let ranlib = "%%RANLIBCMD%%"
+ let default_rpath = "%%RPATH%%"
+ let mksharedlibrpath = "%%MKSHAREDLIBRPATH%%"
+@@ -127,7 +203,7 @@
+ let model = "%%MODEL%%"
+ let system = "%%SYSTEM%%"
+ 
+-let asm = "%%ASM%%"
++let asm = Config_file.(find_default asm "%%ASM%%")
+ let asm_cfi_supported = %%ASM_CFI_SUPPORTED%%
+ let with_frame_pointers = %%WITH_FRAME_POINTERS%%
+ let profinfo = %%WITH_PROFINFO%%
+@@ -142,6 +218,144 @@
  let host = "%%HOST%%"
  let target = "%%TARGET%%"
  
@@ -376,15 +521,20 @@ diff -r -u -x '*~' -x '*.orig' -x '*.rej' ocaml-4.14.0-orig/utils/config.mlp oca
 +
 +end
 +
++let standard_library_default = Config_file.(find_default standard_library_default Relocate.standard_library_default)
++
 +let standard_library =
-+  ignore ( standard_library ); (* avoid warning *)
-+  try
-+    Relocate.slashify ( Sys.getenv "OCAMLLIB" )
-+  with Not_found ->
-+  try
-+    Relocate.slashify ( Sys.getenv "CAMLLIB" )
-+  with Not_found ->
-+    Relocate.standard_library_default
++  let lib =
++    try
++      Relocate.slashify ( Sys.getenv "OCAMLLIB" )
++    with Not_found ->
++      try
++        Relocate.slashify ( Sys.getenv "CAMLLIB" )
++      with Not_found -> standard_library_default
++  in
++  Config_file.find_default
++    Config_file.standard_library
++    lib
 +
  let default_executable_name =
    match Sys.os_type with
