@@ -1,0 +1,103 @@
+diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocamlfind.1.9.6-orig/Makefile ocamlfind.1.9.6-new/Makefile
+--- ocamlfind.1.9.6-orig/Makefile	2022-09-24 17:13:16.000000000 +0200
++++ ocamlfind.1.9.6-new/Makefile	2023-03-30 16:58:32.144586681 +0200
+@@ -54,7 +54,7 @@
+ 	USE_CYGPATH="$(USE_CYGPATH)"; \
+ 	export USE_CYGPATH; \
+ 	cat findlib.conf.in | \
+-	    $(SH) tools/patch '@SITELIB@' '$(OCAML_SITELIB)' | \
++	    $(SH) tools/patch '@SITELIB@' '+..' | \
+ 			$(SH) tools/patch '@FINDLIB_PATH@' '$(FINDLIB_PATH)' -p >findlib.conf
+ 	if ./tools/cmd_from_same_dir ocamlc; then \
+ 		echo 'ocamlc="ocamlc.opt"' >>findlib.conf; \
+diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocamlfind.1.9.6-orig/src/findlib/findlib_config.mlp ocamlfind.1.9.6-new/src/findlib/findlib_config.mlp
+--- ocamlfind.1.9.6-orig/src/findlib/findlib_config.mlp	2022-09-24 17:13:16.000000000 +0200
++++ ocamlfind.1.9.6-new/src/findlib/findlib_config.mlp	2023-03-30 16:57:27.284501205 +0200
+@@ -3,9 +3,12 @@
+  *
+  *)
+ 
+-let config_file = "@CONFIGFILE@";;
+-
+-let ocaml_stdlib = "@STDLIB@";;
++let ( config_file, ocaml_stdlib) =
++  match Sys.getenv "OPAM_SWITCH_PREFIX" with
++  | exception Not_found -> ( "@CONFIGFILE@", "@STDLIB@" )
++  | opam_switch_prefix ->
++    ( Filename.concat opam_switch_prefix "lib/findlib.conf",
++      Filename.concat opam_switch_prefix "lib/ocaml" )
+ 
+ let ocaml_ldconf = Filename.concat ocaml_stdlib "ld.conf";;
+ 
+diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocamlfind.1.9.6-orig/src/findlib/findlib.ml ocamlfind.1.9.6-new/src/findlib/findlib.ml
+--- ocamlfind.1.9.6-orig/src/findlib/findlib.ml	2022-09-24 17:13:16.000000000 +0200
++++ ocamlfind.1.9.6-new/src/findlib/findlib.ml	2023-03-30 16:57:27.288501211 +0200
+@@ -82,6 +82,19 @@
+   init_called := true
+ ;;
+ 
++let ocaml_in_opam = match Sys.getenv "OPAM_SWITCH_PREFIX" with
++  | exception Not_found -> None
++  | s -> Some ( Filename.concat s "lib/ocaml" )
++
++let in_opam dir =
++  let len = String.length dir in
++  if len > 0 && dir.[0] = '+' then
++    match ocaml_in_opam with
++    | None -> failwith "+relative path without OPAM_SWITCH_PREFIX"
++    | Some ocaml_in_opam ->
++      Filename.concat ocaml_in_opam (String.sub dir 1 (len-1))
++  else
++    dir
+ 
+ let command_names cmd_spec =
+   try
+@@ -188,6 +201,9 @@
+             Fl_metascanner.lookup name config_preds vars
+ 	  with Not_found -> default
+ 	in
++	let lookup name default =
++         in_opam ( lookup name default )
++        in
+         let config_tuple =
+ 	  ( (lookup "ocamlc" ocamlc_default),
+ 	    (lookup "ocamlopt" ocamlopt_default),
+@@ -521,4 +537,3 @@
+ 
+ let recorded_predicates() =
+   !rec_preds
+-
+diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocamlfind.1.9.6-orig/src/findlib/frontend.ml ocamlfind.1.9.6-new/src/findlib/frontend.ml
+--- ocamlfind.1.9.6-orig/src/findlib/frontend.ml	2022-09-24 17:13:16.000000000 +0200
++++ ocamlfind.1.9.6-new/src/findlib/frontend.ml	2023-03-30 16:57:27.288501211 +0200
+@@ -233,7 +233,17 @@
+     while true do
+       let line = input_line f in
+       if line <> "" then
+-	lines := line :: !lines
++        lines :=
++          (if line.[0] = '+' then
++             let line =
++               Filename.concat
++                 (Findlib.ocaml_stdlib ())
++                 (String.sub line 1 ((String.length line) - 1))
++             in
++             ();
++             line
++           else
++             line) :: !lines
+     done;
+     assert false
+   with
+diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocamlfind.1.9.6-orig/src/findlib/Makefile ocamlfind.1.9.6-new/src/findlib/Makefile
+--- ocamlfind.1.9.6-orig/src/findlib/Makefile	2022-09-24 17:13:16.000000000 +0200
++++ ocamlfind.1.9.6-new/src/findlib/Makefile	2023-03-30 16:57:27.288501211 +0200
+@@ -109,7 +109,7 @@
+ 	USE_CYGPATH="$(USE_CYGPATH)"; \
+ 	export USE_CYGPATH; \
+ 	cat topfind_rd$(OCAML_REMOVE_DIRECTORY).p | \
+-	        $(SH) $(TOP)/tools/patch '@SITELIB@' '$(OCAML_SITELIB)' \
++	        $(SH) $(TOP)/tools/patch '@SITELIB@' '+..' \
+ 	    	    >topfind
+ 
+ num_top.cma: $(NUMTOP_OBJECTS)
