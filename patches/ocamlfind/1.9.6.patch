@@ -31,7 +31,7 @@ diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocamlfind.1.9.6-orig/src/findlib
  
 diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocamlfind.1.9.6-orig/src/findlib/findlib.ml ocamlfind.1.9.6-new/src/findlib/findlib.ml
 --- ocamlfind.1.9.6-orig/src/findlib/findlib.ml	2022-09-24 17:13:16.000000000 +0200
-+++ ocamlfind.1.9.6-new/src/findlib/findlib.ml	2023-03-30 16:57:27.288501211 +0200
++++ ocamlfind.1.9.6-new/src/findlib/findlib.ml	2023-04-22 17:15:43.575788854 +0200
 @@ -82,6 +82,19 @@
    init_called := true
  ;;
@@ -52,17 +52,32 @@ diff -r -w -u -N -x '*~' -x '*.orig' -x '*.rej' ocamlfind.1.9.6-orig/src/findlib
  
  let command_names cmd_spec =
    try
-@@ -188,6 +201,9 @@
+@@ -188,6 +201,15 @@
              Fl_metascanner.lookup name config_preds vars
  	  with Not_found -> default
  	in
 +	let lookup name default =
 +         in_opam ( lookup name default )
-+        in
++ in
++ let path = match Sys.getenv "OPAM_SWITCH_PREFIX" with
++   | exception Not_found ->
++     lookup "path" ""
++   | s -> Filename.concat s "lib"
++ in
++ let path = Fl_split.path path in
          let config_tuple =
  	  ( (lookup "ocamlc" ocamlc_default),
  	    (lookup "ocamlopt" ocamlopt_default),
-@@ -521,4 +537,3 @@
+@@ -198,7 +220,7 @@
+ 	    (lookup "ocamldep" ocamldep_default),
+ 	    (lookup "ocamlbrowser" ocamlbrowser_default),
+ 	    (lookup "ocamldoc" ocamldoc_default),
+-	    Fl_split.path (lookup "path" ""),
++	    path,
+ 	    (lookup "destdir" ""),
+ 	    (lookup "metadir" "none"),
+ 	    (lookup "stdlib" Findlib_config.ocaml_stdlib),
+@@ -521,4 +543,3 @@
  
  let recorded_predicates() =
    !rec_preds
